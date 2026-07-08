@@ -23,6 +23,18 @@ function fmtDate(iso: string) {
   const d = new Date(iso + 'T00:00:00')
   return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
 }
+function fmtDateParts(iso: string) {
+  const d = new Date(iso + 'T00:00:00')
+  const parts = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }).split(' ')
+  return parts
+}
+
+const SEAT_ATTRIBUTES: Record<string, { icon: string; desc: string }> = {
+  'standard':  { icon: 'power', desc: 'Standard 240V available' },
+  'premium':   { icon: 'star', desc: 'Premium ergonomic desk' },
+  'window':    { icon: 'window', desc: 'Natural light exposure' },
+  'computer':  { icon: 'monitor', desc: 'Desktop computer included' },
+}
 
 export default function BookPage() {
   const router = useRouter()
@@ -32,13 +44,11 @@ export default function BookPage() {
   const [step, setStep] = useState<Step>('datetime')
   const [centre, setCentre] = useState<any>(null)
 
-  // Date + shift selection
   const dates = getDates()
   const [selectedDate, setSelectedDate] = useState(dates[0])
   const [selectedShift, setSelectedShift] = useState<ShiftData | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<PlanData | null>(null)
 
-  // Seat selection
   const [seats, setSeats] = useState<SeatData[]>([])
   const [selectedSeat, setSelectedSeat] = useState<SeatData | null>(null)
   const [lockId, setLockId] = useState<string | null>(null)
@@ -58,7 +68,6 @@ export default function BookPage() {
     })
   }, [])
 
-  // Timer countdown
   useEffect(() => {
     if (!lockExpiry) { setLockTimer(0); return }
     const tick = () => {
@@ -90,10 +99,7 @@ export default function BookPage() {
   const handleSeatClick = async (seat: SeatData) => {
     if (seat.availability !== 'available') return
     if (!user) { setShowOTP(true); return }
-
-    // Release previous lock
     if (lockId) await releaseLock()
-
     setLockingId(seat.id)
     try {
       const r = await fetch('/api/bookings/lock', {
@@ -106,7 +112,6 @@ export default function BookPage() {
       setLockId(lid)
       setLockExpiry(new Date(expiresAt))
       setSelectedSeat(seat)
-      setStep('summary')
     } finally { setLockingId(null) }
   }
 
@@ -137,8 +142,10 @@ export default function BookPage() {
 
   const stepNum = step === 'datetime' ? 1 : step === 'seats' ? 2 : 3
 
+  const availCount = seats.filter(s => s.availability === 'available').length
+
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-base)' }}>
+    <>
       {showOTP && <OTPModal onSuccess={handleLoginSuccess} onClose={() => setShowOTP(false)} />}
       {showPayment && selectedSeat && selectedShift && selectedPlan && (
         <PaymentModal
@@ -154,220 +161,316 @@ export default function BookPage() {
         />
       )}
 
-      {/* Nav */}
-      <nav style={{
-        background: 'rgba(8,8,26,0.9)', backdropFilter: 'blur(16px)',
-        borderBottom: '1px solid var(--border)', padding: '0 24px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60
-      }}>
-        <button onClick={() => router.push('/')} style={{ background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
-          ← Back
-        </button>
-        <span style={{ fontWeight: 800, fontSize: 18 }}>Seat<span style={{ color: 'var(--primary)' }}>Fit</span></span>
-        {user && <span style={{ fontSize: 13, color: 'var(--text-3)' }}>👤 {user.name}</span>}
-        {!user && <button className="btn-ghost" style={{ padding: '6px 14px', fontSize: 13 }} onClick={() => setShowOTP(true)}>Login</button>}
-      </nav>
-
-      <div style={{ maxWidth: 840, margin: '0 auto', padding: '32px 20px' }}>
-        {/* Step Indicator */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, marginBottom: 36 }}>
-          {[{ n: 1, label: 'Date & Shift' }, { n: 2, label: 'Pick Seat' }, { n: 3, label: 'Confirm' }].map((s, i) => (
-            <div key={s.n} style={{ display: 'flex', alignItems: 'center' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                <div className={`step-dot ${stepNum === s.n ? 'step-active' : stepNum > s.n ? 'step-done' : 'step-idle'}`}>
-                  {stepNum > s.n ? '✓' : s.n}
-                </div>
-                <span style={{ fontSize: 11, color: stepNum === s.n ? 'var(--primary)' : 'var(--text-3)', fontWeight: 600, whiteSpace: 'nowrap' }}>{s.label}</span>
-              </div>
-              {i < 2 && <div style={{ width: 64, height: 1, background: stepNum > s.n ? 'var(--success)' : 'var(--border)', margin: '0 8px', marginBottom: 18, transition: 'background 0.3s' }} />}
-            </div>
-          ))}
+      {/* Page title */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 14, color: 'var(--sf-text-2)' }}>
+          <button onClick={() => router.push('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sf-text-2)', fontSize: 14, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>home</span>
+            Hub
+          </button>
+          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>chevron_right</span>
+          <span style={{ color: 'var(--sf-blue)', fontWeight: 600 }}>Book a Spot</span>
         </div>
+        <h1 className="text-headline-lg" style={{ color: 'var(--sf-text-1)' }}>Book a Spot</h1>
+        <p style={{ fontSize: 15, color: 'var(--sf-text-2)', marginTop: 4 }}>
+          Select an available spot on the map or filter by amenities.
+        </p>
+      </div>
 
-        {/* ── STEP 1: Date + Shift ── */}
-        {step === 'datetime' && (
-          <div style={{ animation: 'slideUp 0.3s ease' }}>
-            <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Choose a Date & Shift</h2>
-            <p style={{ color: 'var(--text-2)', fontSize: 14, marginBottom: 24 }}>Select when you want to study</p>
-
-            {/* Date strip */}
-            <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 8, marginBottom: 28 }}>
-              {dates.map(d => {
-                const parts = fmtDate(d).split(' ')
-                const active = d === selectedDate
-                return (
-                  <button key={d} onClick={() => setSelectedDate(d)} style={{
-                    minWidth: 72, padding: '12px 8px', borderRadius: 12, cursor: 'pointer', transition: 'all 0.2s',
-                    background: active ? 'var(--primary)' : 'var(--bg-card)',
-                    border: `1px solid ${active ? 'var(--primary)' : 'var(--border)'}`,
-                    color: active ? 'white' : 'var(--text-2)',
-                    boxShadow: active ? '0 0 20px var(--primary-glow)' : 'none',
-                    textAlign: 'center', flexShrink: 0
-                  }}>
-                    <div style={{ fontSize: 11, fontWeight: 500, opacity: 0.85 }}>{parts[0]}</div>
-                    <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.1 }}>{parts[1]}</div>
-                    <div style={{ fontSize: 11, opacity: 0.75 }}>{parts[2]}</div>
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Shift cards */}
-            <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14, color: 'var(--text-2)' }}>SELECT SHIFT</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
-              {centre?.shifts?.map((s: ShiftData) => {
-                const active = selectedShift?.id === s.id
-                return (
-                  <button key={s.id} onClick={() => setSelectedShift(s)} style={{
-                    padding: '20px 24px', borderRadius: 14, cursor: 'pointer', transition: 'all 0.2s', textAlign: 'left',
-                    background: active ? 'rgba(99,102,241,0.18)' : 'var(--bg-card)',
-                    border: `2px solid ${active ? 'var(--primary)' : 'var(--border)'}`,
-                    boxShadow: active ? '0 0 20px var(--primary-glow)' : 'none',
-                  }}>
-                    <div style={{ fontSize: 24, marginBottom: 8 }}>{s.shiftType === 'morning' ? '🌅' : s.shiftType === 'evening' ? '🌆' : '☀️'}</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)' }}>{s.name}</div>
-                    <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>{s.startTime} – {s.endTime}</div>
-                    {/* Pricing for this shift */}
-                    {centre?.pricingPlans?.length > 0 && (
-                      <div style={{ marginTop: 12, fontSize: 13, color: active ? '#a5b4fc' : 'var(--text-3)' }}>
-                        From ₹{centre.pricingPlans[0].price}
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-
-            <button className="btn-primary" style={{ width: '100%', padding: 14, fontSize: 16 }}
-              disabled={!selectedShift} onClick={goToSeats}>
-              View Available Seats →
-            </button>
-          </div>
-        )}
-
-        {/* ── STEP 2: Seat Map ── */}
-        {step === 'seats' && (
-          <div style={{ animation: 'slideUp 0.3s ease' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <h2 style={{ fontSize: 22, fontWeight: 700 }}>Pick Your Seat</h2>
-              <button className="btn-ghost" style={{ padding: '6px 14px', fontSize: 13 }} onClick={() => setStep('datetime')}>← Back</button>
-            </div>
-            <p style={{ color: 'var(--text-2)', fontSize: 13, marginBottom: 20 }}>
-              {fmtDate(selectedDate)} · {selectedShift?.name} ({selectedShift?.startTime} – {selectedShift?.endTime})
-            </p>
-
-            {/* Legend */}
-            <div style={{ display: 'flex', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
-              {[
-                { cls: 'seat-available', label: 'Available' },
-                { cls: 'seat-booked',   label: 'Booked' },
-                { cls: 'seat-locked',   label: 'Held' },
-                { cls: 'seat-blocked',  label: 'Blocked' },
-              ].map(l => (
-                <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div className={`seat ${l.cls}`} style={{ width: 20, height: 20, fontSize: 0, borderRadius: 4 }} />
-                  <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{l.label}</span>
-                </div>
-              ))}
-            </div>
-
-            {loadingSeats ? (
-              <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-3)' }}>Loading seats...</div>
-            ) : (
-              <div className="glass" style={{ padding: 24 }}>
-                {/* Entry indicator */}
-                <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-3)', background: 'var(--bg-card)', padding: '4px 20px', borderRadius: 999, border: '1px solid var(--border)' }}>
-                    🚪 ENTRY
-                  </span>
-                </div>
-                {Object.keys(rows).sort((a, b) => +a - +b).map(rowKey => {
-                  const rowSeats = rows[+rowKey].sort((a, b) => a.colNumber - b.colNumber)
-                  const rowLabel = ['A', 'B', 'C', 'D'][+rowKey] ?? rowKey
-                  return (
-                    <div key={rowKey} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                      <span style={{ fontSize: 12, color: 'var(--text-3)', width: 16, fontWeight: 600 }}>{rowLabel}</span>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {rowSeats.map(seat => {
-                          const isSelected = selectedSeat?.id === seat.id
-                          const isLocking = lockingId === seat.id
-                          const cls = isSelected ? 'seat-selected' : `seat-${seat.availability}`
-                          return (
-                            <button key={seat.id}
-                              className={`seat ${cls}`}
-                              title={`${seat.label} (${seat.seatType})`}
-                              disabled={seat.availability !== 'available' || !!lockingId}
-                              onClick={() => handleSeatClick(seat)}
-                              style={{ position: 'relative' }}>
-                              {isLocking ? '⏳' : seat.label}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })}
-                <div style={{ textAlign: 'center', marginTop: 16 }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-3)', background: 'var(--bg-card)', padding: '4px 20px', borderRadius: 999, border: '1px solid var(--border)' }}>
-                    🖥 BOARD / WHITEBOARD
-                  </span>
-                </div>
+      {/* Step Indicator */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 32, gap: 0 }}>
+        {[{ n: 1, label: 'Date & Shift' }, { n: 2, label: 'Pick Seat' }, { n: 3, label: 'Confirm' }].map((s, i) => (
+          <div key={s.n} style={{ display: 'flex', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <div className={`step-dot ${stepNum === s.n ? 'step-active' : stepNum > s.n ? 'step-done' : 'step-idle'}`}>
+                {stepNum > s.n ? <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check</span> : s.n}
               </div>
+              <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', color: stepNum === s.n ? 'var(--sf-blue)' : 'var(--outline)' }}>{s.label}</span>
+            </div>
+            {i < 2 && (
+              <div style={{ width: 80, height: 2, background: stepNum > s.n ? '#16a34a' : 'var(--sf-border)', margin: '0 8px', marginBottom: 18, borderRadius: 1, transition: 'background 0.3s' }} />
             )}
           </div>
-        )}
+        ))}
+      </div>
 
-        {/* ── STEP 3: Summary ── */}
-        {step === 'summary' && selectedSeat && selectedShift && (
-          <div style={{ animation: 'slideUp 0.3s ease' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <h2 style={{ fontSize: 22, fontWeight: 700 }}>Confirm Booking</h2>
-              <button className="btn-ghost" style={{ padding: '6px 14px', fontSize: 13 }} onClick={async () => { await releaseLock(); setStep('seats') }}>
-                ← Change Seat
-              </button>
-            </div>
+      {/* ── STEP 1: Date + Shift ── */}
+      {step === 'datetime' && (
+        <div className="animate-in">
+          <h2 className="text-headline-sm" style={{ marginBottom: 4 }}>Choose a Date & Shift</h2>
+          <p style={{ fontSize: 14, color: 'var(--sf-text-2)', marginBottom: 24 }}>Select when you want to study</p>
 
-            {/* Summary card */}
-            <div className="glass" style={{ padding: 28, marginBottom: 20 }}>
-              <div style={{ display: 'grid', gap: 16 }}>
+          {/* Date strip */}
+          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 8, marginBottom: 32, scrollbarWidth: 'none' }}>
+            {dates.map(d => {
+              const parts = fmtDateParts(d)
+              const active = d === selectedDate
+              return (
+                <button key={d} onClick={() => setSelectedDate(d)} className={`date-pill ${active ? 'active' : ''}`}>
+                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 2, opacity: 0.8 }}>{parts[0]}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{parts[1]}</div>
+                  <div style={{ fontSize: 11, marginTop: 2, opacity: 0.75 }}>{parts[2]}</div>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Shifts */}
+          <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--sf-text-2)', letterSpacing: '0.06em', marginBottom: 14, textTransform: 'uppercase' }}>Select Shift</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 14, marginBottom: 28 }}>
+            {centre?.shifts?.map((s: ShiftData) => {
+              const active = selectedShift?.id === s.id
+              const shiftIcon = s.shiftType === 'morning' ? '🌅' : s.shiftType === 'evening' ? '🌇' : '☀️'
+              return (
+                <button key={s.id} onClick={() => setSelectedShift(s)} className={`shift-card ${active ? 'active' : ''}`}>
+                  <div style={{ fontSize: 28, marginBottom: 10 }}>{shiftIcon}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--sf-text-1)', marginBottom: 4 }}>{s.name}</div>
+                  <div style={{ fontSize: 13, color: 'var(--sf-text-2)' }}>{s.startTime} – {s.endTime}</div>
+                  {centre?.pricingPlans?.length > 0 && (
+                    <div style={{ marginTop: 12, fontSize: 14, color: active ? 'var(--sf-blue)' : 'var(--outline)', fontWeight: 600 }}>
+                      From ₹{centre.pricingPlans[0].price}
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Pricing plans */}
+          {centre?.pricingPlans?.length > 0 && (
+            <>
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--sf-text-2)', letterSpacing: '0.06em', marginBottom: 14, textTransform: 'uppercase' }}>Pricing Plan</h3>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 28, flexWrap: 'wrap' }}>
+                {centre.pricingPlans.map((p: PlanData) => {
+                  const active = selectedPlan?.id === p.id
+                  return (
+                    <button key={p.id} onClick={() => setSelectedPlan(p)} style={{
+                      padding: '12px 20px', borderRadius: 10, cursor: 'pointer', transition: 'all 0.2s',
+                      background: active ? 'var(--sf-surface-low)' : 'var(--sf-card)',
+                      border: `2px solid ${active ? 'var(--sf-blue)' : 'var(--sf-border)'}`,
+                      display: 'flex', alignItems: 'baseline', gap: 6
+                    }}>
+                      <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--sf-blue)' }}>₹{p.price}</span>
+                      <span style={{ fontSize: 13, color: 'var(--sf-text-2)', fontWeight: 500 }}>/ {p.name}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+          <button className="btn btn-dark btn-full btn-lg" disabled={!selectedShift} onClick={goToSeats}>
+            View Available Seats
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>arrow_forward</span>
+          </button>
+        </div>
+      )}
+
+      {/* ── STEP 2: Seat Map ── */}
+      {step === 'seats' && (
+        <div className="animate-in" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 20, alignItems: 'start' }}>
+
+          {/* Map area */}
+          <div>
+            {/* Toolbar */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--sf-text-2)' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>grid_view</span>
+                Floor Plan
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>chevron_right</span>
+                <span style={{ color: 'var(--sf-blue)', fontWeight: 600 }}>Quiet Zone North</span>
+              </div>
+
+              <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
                 {[
-                  { label: 'Centre', value: centre?.name ?? '—' },
-                  { label: 'Seat', value: `${selectedSeat.label} (${selectedSeat.seatType})` },
-                  { label: 'Date', value: fmtDate(selectedDate) },
-                  { label: 'Shift', value: `${selectedShift.name} · ${selectedShift.startTime} – ${selectedShift.endTime}` },
-                  { label: 'Amount', value: `₹${selectedPlan?.price ?? 60}` },
-                ].map(row => (
-                  <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
-                    <span style={{ color: 'var(--text-2)', fontSize: 14 }}>{row.label}</span>
-                    <span style={{ fontWeight: 600, fontSize: 14 }}>{row.value}</span>
+                  { cls: 'seat-available', label: 'Available' },
+                  { cls: 'seat-booked',    label: 'Occupied' },
+                  { cls: 'seat-selected',  label: 'Selected' },
+                ].map(l => (
+                  <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div className={`seat ${l.cls}`} style={{ width: 16, height: 16, fontSize: 0, borderRadius: 4 }} />
+                    <span style={{ fontSize: 12, color: 'var(--sf-text-2)' }}>{l.label}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Timer */}
-            {lockTimer > 0 && (
-              <div style={{
-                background: lockTimer < 120 ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
-                border: `1px solid ${lockTimer < 120 ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'}`,
-                borderRadius: 12, padding: '12px 20px', marginBottom: 20,
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-              }}>
-                <span style={{ fontSize: 13, color: 'var(--text-2)' }}>⏱ Seat held for</span>
-                <span style={{ fontSize: 20, fontWeight: 700, color: lockTimer < 120 ? '#ef4444' : '#f59e0b', fontVariantNumeric: 'tabular-nums' }}>
-                  {fmtTimer(lockTimer)}
+            <div style={{ fontSize: 13, color: 'var(--sf-text-2)', marginBottom: 12 }}>
+              {fmtDate(selectedDate)} · {selectedShift?.name} ({selectedShift?.startTime} – {selectedShift?.endTime})
+              {availCount > 0 && <span style={{ marginLeft: 12, color: '#16a34a', fontWeight: 600 }}>● {availCount} available</span>}
+            </div>
+
+            {/* Seat map card */}
+            <div className="card" style={{ padding: 24, background: 'var(--sf-surface-low)' }}>
+              {/* Window indicator */}
+              <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--sf-blue)', letterSpacing: '0.12em', textTransform: 'uppercase', background: 'var(--primary-fixed)', padding: '4px 16px', borderRadius: 999 }}>
+                  Floor-to-Ceiling Windows
                 </span>
               </div>
-            )}
 
-            <button className="btn-primary" style={{ width: '100%', padding: 16, fontSize: 17 }}
-              disabled={!user || lockTimer === 0}
-              onClick={() => { if (!user) { setShowOTP(true) } else { setShowPayment(true) } }}>
-              {!user ? '🔐 Login to Pay' : `Pay ₹${selectedPlan?.price ?? 60} →`}
+              {loadingSeats ? (
+                <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--sf-text-2)' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 40, display: 'block', marginBottom: 12, opacity: 0.4 }}>chair</span>
+                  Loading seats...
+                </div>
+              ) : (
+                <>
+                  {Object.keys(rows).sort((a, b) => +a - +b).map(rowKey => {
+                    const rowSeats = rows[+rowKey].sort((a, b) => a.colNumber - b.colNumber)
+                    const rowLabel = ['A', 'B', 'C', 'D', 'E', 'F'][+rowKey] ?? rowKey
+                    return (
+                      <div key={rowKey} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                        <span style={{ fontSize: 12, color: 'var(--outline)', width: 18, fontWeight: 700, textAlign: 'center' }}>{rowLabel}</span>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {rowSeats.map(seat => {
+                            const isSelected = selectedSeat?.id === seat.id
+                            const isLocking = lockingId === seat.id
+                            const cls = isSelected ? 'seat-selected' : `seat-${seat.availability}`
+                            return (
+                              <button
+                                key={seat.id}
+                                className={`seat ${cls}`}
+                                title={`${seat.label} (${seat.seatType})`}
+                                disabled={seat.availability !== 'available' || !!lockingId}
+                                onClick={() => handleSeatClick(seat)}
+                              >
+                                {isLocking ? '⏳' : seat.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {/* Walkway */}
+                  <div style={{ textAlign: 'center', margin: '16px 0', fontSize: 11, color: 'var(--outline)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                    — Main Walkway —
+                  </div>
+                </>
+              )}
+
+              {/* Entry indicator */}
+              <div style={{ textAlign: 'center', marginTop: 12 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--sf-text-2)', letterSpacing: '0.1em', textTransform: 'uppercase', background: 'var(--sf-surface-container)', padding: '4px 16px', borderRadius: 999 }}>
+                  🚪 Entry
+                </span>
+              </div>
+            </div>
+
+            <button className="btn btn-outline btn-sm" style={{ marginTop: 14 }} onClick={() => setStep('datetime')}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>
+              Change Date / Shift
             </button>
           </div>
-        )}
-      </div>
-    </div>
+
+          {/* Right panel — seat detail */}
+          <div className="card card-p" style={{ position: 'sticky', top: 20 }}>
+            {selectedSeat ? (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                  <span style={{ background: 'var(--sf-surface-low)', color: '#16a34a', fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(22,163,74,0.25)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a', display: 'inline-block' }} />
+                    Available Now
+                  </span>
+                  <span className="material-symbols-outlined" style={{ color: 'var(--outline)', cursor: 'pointer' }}>favorite_border</span>
+                </div>
+                <h2 style={{ fontSize: 28, fontWeight: 800, color: 'var(--sf-text-1)', letterSpacing: '-0.5px', marginBottom: 6 }}>
+                  SPOT {selectedSeat.label}
+                </h2>
+                <p style={{ fontSize: 14, color: 'var(--sf-text-2)', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 20 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>location_on</span>
+                  StudyHub · {selectedSeat.seatType?.replace('_', ' ')}
+                </p>
+
+                {/* Duration tabs */}
+                <div style={{ marginBottom: 20 }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--sf-text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Date & Duration</p>
+                  <div style={{ display: 'flex', background: 'var(--sf-surface-container)', borderRadius: 8, padding: 4, gap: 4, marginBottom: 12 }}>
+                    {[{ label: '2h', plan: 0 }, { label: '4h', plan: 1 }, { label: 'Full Day', plan: 2 }].map((t, i) => {
+                      const plan = centre?.pricingPlans?.[i] ?? null
+                      const active = selectedPlan?.id === plan?.id
+                      return (
+                        <button key={t.label} onClick={() => plan && setSelectedPlan(plan)} style={{
+                          flex: 1, padding: '8px 4px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                          fontSize: 13, fontWeight: 600, transition: 'all 0.15s',
+                          background: active ? 'var(--sf-card)' : 'transparent',
+                          color: active ? 'var(--sf-text-1)' : 'var(--sf-text-2)',
+                          boxShadow: active ? '0 1px 4px rgba(0,0,0,0.1)' : 'none'
+                        }}>{t.label}</button>
+                      )
+                    })}
+                  </div>
+                  <div style={{ fontSize: 14, color: 'var(--sf-text-2)' }}>
+                    📅 {fmtDate(selectedDate)} · {selectedShift?.startTime} – {selectedShift?.endTime}
+                  </div>
+                </div>
+
+                {/* Attributes */}
+                <div style={{ marginBottom: 20 }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--sf-text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Attributes</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {[
+                      { icon: 'power', label: 'Power Socket', desc: 'Standard 240V available' },
+                      { icon: 'chair', label: 'Ergonomic Chair', desc: 'Adjustable Herman Miller' },
+                      { icon: 'wb_sunny', label: 'Near Window', desc: 'Natural light exposure' },
+                    ].map(attr => (
+                      <div key={attr.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        <div style={{ width: 20, height: 20, borderRadius: 4, background: 'var(--sf-blue)', flexShrink: 0, marginTop: 2 }} />
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--sf-text-1)' }}>{attr.label}</div>
+                          <div style={{ fontSize: 12, color: 'var(--sf-text-2)' }}>{attr.desc}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Timer */}
+                {lockTimer > 0 && (
+                  <div style={{
+                    background: lockTimer < 120 ? 'rgba(220,38,38,0.08)' : 'rgba(254,166,25,0.1)',
+                    border: `1px solid ${lockTimer < 120 ? 'rgba(220,38,38,0.3)' : 'rgba(254,166,25,0.3)'}`,
+                    borderRadius: 8, padding: '10px 14px', marginBottom: 16,
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                  }}>
+                    <span style={{ fontSize: 13, color: 'var(--sf-text-2)' }}>⏱ Seat held for</span>
+                    <span style={{ fontSize: 20, fontWeight: 700, color: lockTimer < 120 ? '#dc2626' : '#b45309', fontVariantNumeric: 'tabular-nums' }}>
+                      {fmtTimer(lockTimer)}
+                    </span>
+                  </div>
+                )}
+
+                <button
+                  className="btn btn-primary btn-full btn-lg"
+                  style={{ borderRadius: 10 }}
+                  disabled={!user || lockTimer === 0}
+                  onClick={() => { if (!user) setShowOTP(true); else setShowPayment(true) }}
+                >
+                  {!user ? '🔐 Login to Continue' : `Confirm Spot Reservation →`}
+                </button>
+                <p style={{ fontSize: 12, color: 'var(--sf-text-2)', textAlign: 'center', marginTop: 8 }}>
+                  By confirming, you agree to the Centre Code of Conduct.
+                </p>
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--sf-border)', display: 'block', marginBottom: 12 }}>
+                  touch_app
+                </span>
+                <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--sf-text-1)', marginBottom: 6 }}>Select a Spot</p>
+                <p style={{ fontSize: 13, color: 'var(--sf-text-2)' }}>
+                  Click on any available seat on the map to see details and book.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── STEP 3: Confirm booking (from summary flow when seat is selected in step 2) ── */}
+      {/* Note: confirmation is handled inline in step 2 via the right panel */}
+    </>
   )
 }

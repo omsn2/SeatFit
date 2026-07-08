@@ -1,210 +1,267 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 
 const CENTRE_ID = 'centre-studyhub-01'
 
-export default function LandingPage() {
+const STUDY_SPOTS = [
+  {
+    id: 1,
+    name: 'Desk Q12 — Quiet Zone',
+    location: 'StudyHub, Level 1',
+    tags: ['Power', 'Silent'],
+    status: 'Available',
+    statusColor: '#16a34a',
+    gradient: 'linear-gradient(135deg,#e5eeff 0%,#dde1ff 100%)',
+    icon: '🪑',
+  },
+  {
+    id: 2,
+    name: 'Pod G04 — Group Hub',
+    location: 'StudyHub, Level 1',
+    tags: ['Screen Share', 'Seats 4'],
+    status: 'Available at 3:00 PM',
+    statusColor: '#b45309',
+    gradient: 'linear-gradient(135deg,#fdf3e0 0%,#ffddb8 100%)',
+    icon: '🛋️',
+  },
+  {
+    id: 3,
+    name: 'Station T11 — Tech Row',
+    location: 'StudyHub, Level 1',
+    tags: ['Dual Monitors', 'High-speed LAN'],
+    status: 'Available',
+    statusColor: '#16a34a',
+    gradient: 'linear-gradient(135deg,#e5eeff 0%,#d3e4fe 100%)',
+    icon: '🖥️',
+  },
+]
+
+const ZONES = [
+  { name: 'Quiet Zone',  pct: 82, label: 'Very Busy',       color: 'var(--sf-blue)' },
+  { name: 'Group Hub',   pct: 45, label: 'Moderate',         color: 'var(--sf-gold)' },
+  { name: 'Tech Row',    pct: 15, label: 'Plenty of spots',  color: 'var(--sf-blue-dim)' },
+]
+
+export default function HubPage() {
   const router = useRouter()
   const [centre, setCentre] = useState<any>(null)
   const [user, setUser] = useState<any>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     const stored = localStorage.getItem('sf_user')
     if (stored) setUser(JSON.parse(stored))
-    fetch(`/api/centres/${CENTRE_ID}`).then(r => r.json()).then(setCentre)
+    fetch(`/api/centres/${CENTRE_ID}`).then(r => r.json()).then(setCentre).catch(() => {})
   }, [])
 
-  const handleLogout = () => {
-    localStorage.removeItem('sf_user')
-    setUser(null)
+  const greeting = () => {
+    const h = new Date().getHours()
+    if (h < 12) return 'Good morning,'
+    if (h < 17) return 'Good afternoon,'
+    return 'Good evening,'
   }
 
-  const amenities: string[] = centre ? centre.amenities : []
-
-  const amenityIcons: Record<string, string> = {
-    AC: '❄️', WiFi: '📶', Printing: '🖨️', Lockers: '🔒', 'Charging Points': '⚡'
-  }
+  const firstName = user?.name?.split(' ')[0] ?? 'Student'
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-base)' }}>
-      {/* Nav */}
-      <nav style={{
-        position: 'sticky', top: 0, zIndex: 40,
-        background: 'rgba(8,8,26,0.85)', backdropFilter: 'blur(16px)',
-        borderBottom: '1px solid var(--border)', padding: '0 24px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64
-      }}>
-        <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-1)', letterSpacing: '-0.5px' }}>
-          Seat<span style={{ color: 'var(--primary)' }}>Fit</span>
-        </span>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          {user ? (
-            <>
-              {user.role === 'centre_admin' && (
-                <Link href="/admin" style={{ color: 'var(--text-2)', textDecoration: 'none', fontSize: 14 }}>
-                  Admin Panel
-                </Link>
-              )}
-              <Link href="/my-bookings" style={{ color: 'var(--text-2)', textDecoration: 'none', fontSize: 14 }}>
-                My Bookings
-              </Link>
-              <span style={{ fontSize: 14, color: 'var(--text-3)' }}>{user.name}</span>
-              <button className="btn-ghost" onClick={handleLogout} style={{ padding: '6px 14px', fontSize: 13 }}>
-                Logout
-              </button>
-            </>
-          ) : (
-            <button className="btn-primary" style={{ padding: '8px 20px', fontSize: 14 }}
-              onClick={() => router.push('/book')}>
-              Login
-            </button>
-          )}
-        </div>
-      </nav>
-
-      {/* Hero */}
-      <div style={{
-        position: 'relative', overflow: 'hidden',
-        padding: '80px 24px 60px', textAlign: 'center',
-        background: 'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(99,102,241,0.18) 0%, transparent 60%)'
-      }}>
-        {/* Glowing orb */}
-        <div style={{
-          position: 'absolute', top: -80, left: '50%', transform: 'translateX(-50%)',
-          width: 400, height: 400, borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)',
-          pointerEvents: 'none'
-        }} />
-
-        <div style={{ display: 'inline-block', marginBottom: 16 }}>
-          <span style={{
-            background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)',
-            color: '#a5b4fc', fontSize: 12, fontWeight: 600, padding: '5px 14px', borderRadius: 999,
-            letterSpacing: 0.5
-          }}>
-            📍 Koramangala, Bengaluru
-          </span>
-        </div>
-
-        <h1 style={{
-          fontSize: 'clamp(36px, 6vw, 64px)', fontWeight: 800, lineHeight: 1.1,
-          letterSpacing: '-2px', marginBottom: 16, color: 'var(--text-1)'
-        }}>
-          Book your seat,<br />
-          <span style={{
-            background: 'linear-gradient(135deg, #6366f1, #a78bfa)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
-          }}>own your day.</span>
-        </h1>
-
-        <p style={{ fontSize: 18, color: 'var(--text-2)', maxWidth: 480, margin: '0 auto 32px', lineHeight: 1.6 }}>
-          Reserve your preferred seat at StudyHub. Morning, Evening & Full Day shifts — book in under 60 seconds.
-        </p>
-
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button className="btn-primary" style={{ fontSize: 16, padding: '14px 36px' }}
-            onClick={() => router.push('/book')}>
-            Book a Seat →
-          </button>
-          {user?.role === 'centre_admin' && (
-            <button className="btn-ghost" onClick={() => router.push('/admin')}>
-              Admin Panel
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Centre Info Card */}
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 24px 80px' }}>
-        {centre ? (
-          <div className="glass" style={{ padding: 32, marginBottom: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
-              <div>
-                <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{centre.name}</h2>
-                <p style={{ color: 'var(--text-2)', fontSize: 14 }}>📍 {centre.address}</p>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 4 }}>Open hours</div>
-                <div style={{ fontWeight: 600, color: 'var(--text-1)' }}>
-                  {centre.openTime} – {centre.closeTime}
-                </div>
-              </div>
-            </div>
-
-            {/* Stats */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16, marginBottom: 24 }}>
-              {[
-                { label: 'Total Seats', value: centre.totalSeats, icon: '💺' },
-                { label: 'Shifts Available', value: centre.shifts?.length ?? 2, icon: '⏰' },
-                { label: 'Starting From', value: '₹60', icon: '💳' },
-              ].map(stat => (
-                <div key={stat.label} style={{
-                  background: 'rgba(99,102,241,0.07)', border: '1px solid var(--border)',
-                  borderRadius: 12, padding: '16px 20px'
-                }}>
-                  <div style={{ fontSize: 22, marginBottom: 6 }}>{stat.icon}</div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-1)' }}>{stat.value}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 500, marginTop: 2 }}>{stat.label}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Amenities */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {amenities.map((a: string) => (
-                <span key={a} className="chip">{amenityIcons[a] ?? '✅'} {a}</span>
-              ))}
-            </div>
+    <>
+      {/* Page Header */}
+      <section style={{ display: 'flex', flexDirection: 'column', gap: 24, marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+          <div>
+            <p style={{ color: 'var(--sf-blue)', fontSize: 18, fontWeight: 500, marginBottom: 4 }}>
+              {greeting()}
+            </p>
+            <h1 className="text-display-lg" style={{ color: 'var(--sf-text-1)', lineHeight: 1.15 }}>
+              Ready to hit the books,<br />
+              <span style={{ color: 'var(--sf-blue)' }}>{firstName}?</span>
+            </h1>
           </div>
-        ) : (
-          <div className="glass" style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)' }}>
-            Loading centre info...
-          </div>
-        )}
 
-        {/* Shifts */}
-        {centre?.shifts && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 32 }}>
-            {centre.shifts.map((s: any) => (
-              <div key={s.id} className="glass" style={{ padding: 24 }}>
-                <div style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 500, marginBottom: 8 }}>
-                  {s.shiftType === 'morning' ? '🌅' : '🌆'} {s.name} Shift
+          {/* Search */}
+          <div className="search-bar" style={{ width: 340, maxWidth: '100%' }}>
+            <span className="material-symbols-outlined search-icon">search</span>
+            <input
+              type="text"
+              placeholder="Find a Study Spot..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Bento grid: Availability + Upcoming Bookings */}
+      <section style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, marginBottom: 40, alignItems: 'stretch' }}>
+
+        {/* Centre Availability */}
+        <div className="card card-p" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h2 className="text-headline-sm" style={{ color: 'var(--sf-text-1)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="material-symbols-outlined" style={{ color: 'var(--sf-blue)', fontSize: 22 }}>data_usage</span>
+                Centre Availability
+              </h2>
+              <p style={{ fontSize: 14, color: 'var(--sf-text-2)', marginTop: 2 }}>StudyHub live occupancy</p>
+            </div>
+            <span style={{
+              background: 'var(--sf-surface-high)', color: 'var(--sf-blue)',
+              fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 999,
+              display: 'flex', alignItems: 'center', gap: 6
+            }}>
+              <span className="live-dot" />
+              Live
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20 }}>
+            {ZONES.map(z => (
+              <div key={z.name} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 500 }}>
+                  <span style={{ color: 'var(--sf-text-1)' }}>{z.name}</span>
+                  <span style={{ color: 'var(--sf-text-2)' }}>{z.pct}%</span>
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 700 }}>{s.startTime} – {s.endTime}</div>
-                <button className="btn-primary" style={{ marginTop: 16, width: '100%', padding: '10px' }}
-                  onClick={() => router.push('/book')}>
-                  Book →
-                </button>
+                <div className="progress-bar">
+                  <div className="progress-fill" style={{ width: `${z.pct}%`, background: z.color }} />
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--sf-text-2)', fontWeight: 500 }}>{z.label}</p>
               </div>
             ))}
           </div>
-        )}
 
-        {/* Pricing */}
-        {centre?.pricingPlans && (
-          <div className="glass" style={{ padding: 28 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Pricing</h3>
-            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-              {centre.pricingPlans.map((p: any) => (
-                <div key={p.id} style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                  <span style={{ fontSize: 24, fontWeight: 800, color: 'var(--primary)' }}>₹{p.price}</span>
-                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>/ {p.name}</span>
+          {/* Quick stats from centre data */}
+          {centre && (
+            <div style={{ display: 'flex', gap: 16, paddingTop: 8, borderTop: '1px solid var(--sf-border)', flexWrap: 'wrap' }}>
+              {[
+                { icon: '💺', label: 'Total Seats', value: centre.totalSeats },
+                { icon: '⏰', label: 'Shifts', value: centre.shifts?.length ?? 2 },
+                { icon: '💳', label: 'From', value: `₹${centre.pricingPlans?.[0]?.price ?? 60}` },
+              ].map(s => (
+                <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 18 }}>{s.icon}</span>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--sf-text-1)' }}>{s.value}</div>
+                    <div style={{ fontSize: 11, color: 'var(--sf-text-2)', fontWeight: 500 }}>{s.label}</div>
+                  </div>
                 </div>
               ))}
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
 
-      {/* Footer */}
-      <footer style={{
-        borderTop: '1px solid var(--border)', padding: '20px 24px',
-        textAlign: 'center', color: 'var(--text-3)', fontSize: 13
-      }}>
-        © 2026 SeatFit · Study Centre Seat Booking
-      </footer>
-    </div>
+        {/* Upcoming Bookings panel */}
+        <div className="card-blue" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at top right, rgba(255,255,255,0.12) 0%, transparent 55%)', borderRadius: 'inherit', pointerEvents: 'none' }} />
+          <h2 className="text-headline-sm" style={{ position: 'relative' }}>Upcoming Bookings</h2>
+
+          {user ? (
+            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+              <div style={{
+                background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)',
+                borderRadius: 10, padding: '14px 16px',
+                border: '1px solid rgba(255,255,255,0.18)',
+                cursor: 'pointer', transition: 'background 0.2s'
+              }}
+                onClick={() => router.push('/my-bookings')}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.18)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+              >
+                <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--sf-blue-dim)', marginBottom: 4 }}>Today · Check your bookings</div>
+                <div style={{ fontSize: 17, fontWeight: 700, color: 'white' }}>My Bookings →</div>
+                <div style={{ fontSize: 13, color: 'var(--sf-blue-dim)', marginTop: 2 }}>View all upcoming sessions</div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+              <p style={{ fontSize: 14, color: 'var(--sf-blue-dim)', lineHeight: 1.5 }}>
+                Sign in to see and manage your upcoming study sessions.
+              </p>
+            </div>
+          )}
+
+          <button
+            className="btn"
+            style={{
+              width: '100%', padding: '12px', borderRadius: 8, position: 'relative',
+              border: '1.5px dashed var(--sf-blue-dim)', color: 'var(--sf-blue-dim)',
+              background: 'transparent', fontSize: 14, fontWeight: 600,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+            }}
+            onClick={() => router.push('/book')}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
+            Book a spot
+          </button>
+        </div>
+      </section>
+
+      {/* Suggested Study Spots */}
+      <section>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h2 className="text-headline-sm" style={{ color: 'var(--sf-text-1)' }}>Suggested Study Spots</h2>
+          <button
+            className="btn btn-outline btn-sm"
+            onClick={() => router.push('/book')}
+          >
+            View map →
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 20 }}>
+          {STUDY_SPOTS.filter(s =>
+            !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase())
+          ).map(spot => (
+            <div
+              key={spot.id}
+              className="card"
+              style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+            >
+              {/* Spot illustration */}
+              <div style={{
+                height: 140, background: spot.gradient,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                position: 'relative', flexShrink: 0
+              }}>
+                <span style={{ fontSize: 52 }}>{spot.icon}</span>
+                <div style={{
+                  position: 'absolute', top: 12, right: 12,
+                  background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(4px)',
+                  padding: '3px 10px', borderRadius: 999,
+                  fontSize: 12, fontWeight: 600, color: spot.statusColor,
+                  border: '1px solid rgba(0,0,0,0.08)'
+                }}>
+                  {spot.status}
+                </div>
+              </div>
+
+              {/* Card body */}
+              <div style={{ padding: '16px 20px', flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--sf-text-1)', marginBottom: 3 }}>{spot.name}</h3>
+                  <p style={{ fontSize: 13, color: 'var(--sf-text-2)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>location_on</span>
+                    {spot.location}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {spot.tags.map(t => (
+                    <span key={t} className="chip">{t}</span>
+                  ))}
+                </div>
+                <button
+                  className="btn btn-primary btn-full"
+                  style={{ marginTop: 'auto' }}
+                  onClick={() => router.push('/book')}
+                >
+                  Book Spot
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </>
   )
 }

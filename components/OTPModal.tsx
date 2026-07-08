@@ -44,25 +44,26 @@ export default function OTPModal({ onSuccess, onClose }: {
       <div className="modal-box">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700 }}>{phase === 'phone' ? 'Login / Sign Up' : 'Enter OTP'}</h2>
-            <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 4 }}>
-              {phase === 'phone' ? 'No password needed' : `Sent to ${phone}`}
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--sf-text-1)' }}>{phase === 'phone' ? 'Sign In to SeatFit' : 'Enter OTP'}</h2>
+            <p style={{ fontSize: 13, color: 'var(--sf-text-2)', marginTop: 4 }}>
+              {phase === 'phone' ? 'No password needed. Enter your phone.' : `Code sent to ${phone}`}
             </p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sf-text-2)', cursor: 'pointer', fontSize: 20, lineHeight: 1, display: 'flex', alignItems: 'center' }}>
+            <span className="material-symbols-outlined">close</span>
+          </button>
         </div>
 
         {phase === 'phone' ? (
           <>
             <input className="sf-input" type="tel" value={phone} onChange={e => setPhone(e.target.value)}
-              placeholder="+91 98765 43210" style={{ marginBottom: 16 }} />
-            {/* Demo hint */}
-            <div style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#a5b4fc' }}>
-              💡 <strong>Demo:</strong> Any phone works. OTP is always <strong>123456</strong>.<br />
-              Admin login: <strong>+919999000001</strong>
+              placeholder="+91 98765 43210" style={{ marginBottom: 14 }} />
+            <div style={{ background: 'var(--sf-surface-low)', border: '1px solid var(--sf-border)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: 'var(--sf-text-2)' }}>
+              💡 <strong>Demo:</strong> Any phone works. OTP is always <strong style={{ color: 'var(--sf-blue)' }}>123456</strong>.<br />
+              Admin: <strong>+919999000001</strong>
             </div>
-            {error && <p style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 12 }}>{error}</p>}
-            <button className="btn-primary" style={{ width: '100%', padding: 14 }} disabled={loading || phone.length < 10} onClick={sendOTP}>
+            {error && <p style={{ color: 'var(--sf-error)', fontSize: 13, marginBottom: 12 }}>{error}</p>}
+            <button className="btn btn-primary btn-full" style={{ padding: 14 }} disabled={loading || phone.length < 10} onClick={sendOTP}>
               {loading ? 'Sending...' : 'Send OTP →'}
             </button>
           </>
@@ -78,15 +79,15 @@ export default function OTPModal({ onSuccess, onClose }: {
                 />
               ))}
             </div>
-            <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-3)', marginBottom: 16 }}>
-              Demo OTP: <strong style={{ color: 'var(--primary)' }}>123456</strong>
+            <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--sf-text-2)', marginBottom: 16 }}>
+              Demo OTP: <strong style={{ color: 'var(--sf-blue)' }}>123456</strong>
             </div>
-            {error && <p style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 12, textAlign: 'center' }}>{error}</p>}
-            <button className="btn-primary" style={{ width: '100%', padding: 14 }}
+            {error && <p style={{ color: 'var(--sf-error)', fontSize: 13, marginBottom: 12, textAlign: 'center' }}>{error}</p>}
+            <button className="btn btn-primary btn-full" style={{ padding: 14 }}
               disabled={loading || otp.join('').length < 6} onClick={verifyOTP}>
               {loading ? 'Verifying...' : 'Verify & Continue →'}
             </button>
-            <button className="btn-ghost" style={{ width: '100%', marginTop: 10 }} onClick={() => { setPhase('phone'); setOtp(['','','','','','']); setError('') }}>
+            <button className="btn btn-outline btn-full" style={{ marginTop: 10 }} onClick={() => { setPhase('phone'); setOtp(['','','','','','']); setError('') }}>
               ← Change number
             </button>
           </>
