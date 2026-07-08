@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String   @unique
+  email     String?
+  role      String   @default("member")
+  centreId  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  centre    Centre?    @relation(fields: [centreId], references: [id])
+  bookings  Booking[]
+  seatLocks SeatLock[]
+
+  @@index([phone])
+  @@index([role])
+}
+
+model Centre {
+  id           String   @id @default(cuid())
+  name         String
+  address      String
+  city         String
+  totalSeats   Int
+  openTime     String
+  closeTime    String
+  amenities    String   @default("[]")
+  photos       String   @default("[]")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  users        User[]
+  seats        Seat[]
+  shifts       Shift[]
+  pricingPlans PricingPlan[]
+  bookings     Booking[]
+}
+
+model Seat {
+  id        String   @id @default(cuid())
+  centreId  String
+  label     String
+  seatType  String   @default("standard")
+  status    String   @default("available")
+  rowNumber Int
+  colNumber Int
+  createdAt DateTime @default(now())
+
+  centre    Centre     @relation(fields: [centreId], references: [id], onDelete: Cascade)
+  bookings  Booking[]
+  seatLocks SeatLock[]
+
+  @@unique([centreId, label])
+  @@index([centreId])
+}
+
+model Shift {
+  id        String   @id @default(cuid())
+  centreId  String
+  name      String
+  startTime String
+  endTime   String
+  shiftType String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  centre    Centre     @relation(fields: [centreId], references: [id], onDelete: Cascade)
+  bookings  Booking[]
+  seatLocks SeatLock[]
+}
+
+model PricingPlan {
+  id        String   @id @default(cuid())
+  centreId  String
+  name      String
+  planType  String
+  price     Float
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  centre   Centre    @relation(fields: [centreId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+}
+
+model Booking {
+  id            String    @id @default(cuid())
+  userId        String
+  seatId        String
+  centreId      String
+  shiftId       String
+  pricingPlanId String
+  bookingDate   String
+  status        String    @default("pending")
+  paymentStatus String    @default("unpaid")
+  amount        Float
+  qrCode        String?   @unique
+  notes         String?
+  isWalkIn      Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  cancelledAt   DateTime?
+
+  user        User        @relation(fields: [userId], references: [id])
+  seat        Seat        @relation(fields: [seatId], references: [id])
+  centre      Centre      @relation(fields: [centreId], references: [id])
+  shift       Shift       @relation(fields: [shiftId], references: [id])
+  pricingPlan PricingPlan @relation(fields: [pricingPlanId], references: [id])
+  payment     Payment?
+
+  @@unique([seatId, shiftId, bookingDate])
+  @@index([userId])
+  @@index([centreId])
+  @@index([bookingDate])
+  @@index([status])
+}
+
+model Payment {
+  id                String    @id @default(cuid())
+  bookingId         String    @unique
+  amount            Float
+  method            String?
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  status            String    @default("created")
+  paidAt            DateTime?
+  refundedAt        DateTime?
+  refundAmount      Float?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@index([bookingId])
+  @@index([status])
+}
+
+model SeatLock {
+  id        String   @id @default(cuid())
+  seatId    String
+  userId    String
+  shiftId   String
+  lockDate  String
+  expiresAt DateTime
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  seat  Seat  @relation(fields: [seatId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+  shift Shift @relation(fields: [shiftId], references: [id])
+
+  @@unique([seatId, shiftId, lockDate])
+  @@index([expiresAt])
+}
