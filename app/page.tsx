@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { CentreAPI, getStoredUser } from '@/lib/api'
 
 const CENTRE_ID = 'centre-studyhub-01'
 
@@ -50,9 +51,9 @@ export default function HubPage() {
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
-    const stored = localStorage.getItem('sf_user')
-    if (stored) setUser(JSON.parse(stored))
-    fetch(`/api/centres/${CENTRE_ID}`).then(r => r.json()).then(setCentre).catch(() => {})
+    const stored = getStoredUser()
+    if (stored) setUser(stored)
+    CentreAPI.list().then(cs => { if (cs.length) setCentre(cs[0]) }).catch(() => {})
   }, [])
 
   const greeting = () => {

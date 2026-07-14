@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { AdminAPI, getStoredUser } from '@/lib/api'
 
 /* ─── Static data for visuals ─── */
 const ZONE_HEATMAP = [
@@ -36,10 +37,10 @@ export default function AdminDashboard() {
     const stored = localStorage.getItem('sf_user')
     if (!stored) { router.push('/book'); return }
     const u = JSON.parse(stored)
-    if (u.role !== 'centre_admin') { router.push('/'); return }
+    // Java returns 'CENTRE_ADMIN' (uppercase), accept both
+    if (!u.role || !['centre_admin','CENTRE_ADMIN'].includes(u.role)) { router.push('/'); return }
     setUser(u)
-    fetch('/api/admin/dashboard')
-      .then(r => r.json())
+    AdminAPI.dashboard()
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
@@ -58,7 +59,7 @@ export default function AdminDashboard() {
 
   const refresh = () => {
     setLoading(true)
-    fetch('/api/admin/dashboard').then(r => r.json()).then(d => { setData(d); setLoading(false) })
+    AdminAPI.dashboard().then(d => { setData(d); setLoading(false) })
   }
 
   return (

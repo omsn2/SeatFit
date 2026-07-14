@@ -3,15 +3,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import OTPModal from '@/components/OTPModal'
 import PaymentModal from '@/components/PaymentModal'
-
-const CENTRE_ID = 'centre-studyhub-01'
+import { CentreAPI, BookingAPI, getStoredUser, type CentreDetail, type SeatAvailability, type Shift, type PricingPlan } from '@/lib/api'
 
 type Step = 'datetime' | 'seats' | 'summary'
-type SeatStatus = 'available' | 'booked' | 'locked' | 'blocked' | 'selected'
-
-interface SeatData { id: string; label: string; seatType: string; rowNumber: number; colNumber: number; availability: SeatStatus }
-interface ShiftData { id: string; name: string; startTime: string; endTime: string; shiftType: string }
-interface PlanData  { id: string; name: string; planType: string; price: number }
 
 function getDates() {
   return Array.from({ length: 7 }, (_, i) => {
@@ -25,15 +19,7 @@ function fmtDate(iso: string) {
 }
 function fmtDateParts(iso: string) {
   const d = new Date(iso + 'T00:00:00')
-  const parts = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }).split(' ')
-  return parts
-}
-
-const SEAT_ATTRIBUTES: Record<string, { icon: string; desc: string }> = {
-  'standard':  { icon: 'power', desc: 'Standard 240V available' },
-  'premium':   { icon: 'star', desc: 'Premium ergonomic desk' },
-  'window':    { icon: 'window', desc: 'Natural light exposure' },
-  'computer':  { icon: 'monitor', desc: 'Desktop computer included' },
+  return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }).split(' ')
 }
 
 export default function BookPage() {
@@ -42,15 +28,16 @@ export default function BookPage() {
   const [showOTP, setShowOTP] = useState(false)
   const [showPayment, setShowPayment] = useState(false)
   const [step, setStep] = useState<Step>('datetime')
-  const [centre, setCentre] = useState<any>(null)
+  const [centre, setCentre] = useState<CentreDetail | null>(null)
+  const [centreError, setCentreError] = useState(false)
 
   const dates = getDates()
   const [selectedDate, setSelectedDate] = useState(dates[0])
-  const [selectedShift, setSelectedShift] = useState<ShiftData | null>(null)
-  const [selectedPlan, setSelectedPlan] = useState<PlanData | null>(null)
+  const [selectedShift, setSelectedShift] = useState<Shift | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null)
 
-  const [seats, setSeats] = useState<SeatData[]>([])
-  const [selectedSeat, setSelectedSeat] = useState<SeatData | null>(null)
+  const [seats, setSeats] = useState<SeatAvailability[]>([])
+  const [selectedSeat, setSelectedSeat] = useState<SeatAvailability | null>(null)
   const [lockId, setLockId] = useState<string | null>(null)
   const [lockExpiry, setLockExpiry] = useState<Date | null>(null)
   const [lockTimer, setLockTimer] = useState<number>(0)
@@ -58,16 +45,26 @@ export default function BookPage() {
   const [lockingId, setLockingId] = useState<string | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Load user from storage
   useEffect(() => {
-    const stored = localStorage.getItem('sf_user')
-    if (stored) setUser(JSON.parse(stored))
-    fetch(`/api/centres/${CENTRE_ID}`).then(r => r.json()).then(d => {
-      setCentre(d)
-      if (d.shifts?.length) setSelectedShift(d.shifts[0])
-      if (d.pricingPlans?.length) setSelectedPlan(d.pricingPlans[0])
-    })
+    const stored = getStoredUser()
+    if (stored) setUser(stored)
   }, [])
 
+  // Load first centre dynamically (fetches real UUID from DB)
+  useEffect(() => {
+    CentreAPI.list()
+      .then(centres => {
+        if (!centres.length) { setCentreError(true); return }
+        const c = centres[0]
+        setCentre(c)
+        if (c.shifts?.length) setSelectedShift(c.shifts[0])
+        if (c.pricingPlans?.length) setSelectedPlan(c.pricingPlans[0])
+      })
+      .catch(() => setCentreError(true))
+  }, [])
+
+  // Lock countdown timer
   useEffect(() => {
     if (!lockExpiry) { setLockTimer(0); return }
     const tick = () => {
@@ -81,37 +78,32 @@ export default function BookPage() {
   }, [lockExpiry])
 
   const loadSeats = async () => {
-    if (!selectedShift) return
+    if (!selectedShift || !centre) return
     setLoadingSeats(true)
     try {
-      const r = await fetch(`/api/centres/${CENTRE_ID}/availability?date=${selectedDate}&shiftId=${selectedShift.id}`)
-      const data = await r.json()
+      const data = await CentreAPI.seats(centre.id, selectedShift.id, selectedDate)
       setSeats(data)
     } finally { setLoadingSeats(false) }
   }
 
-  const releaseLock = async () => {
-    if (lockId) { await fetch('/api/bookings/lock', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lockId }) }) }
+  const releaseLock = () => {
+    // Locks expire automatically after TTL — no need to delete
     setLockId(null); setLockExpiry(null); setSelectedSeat(null)
     if (timerRef.current) clearInterval(timerRef.current)
   }
 
-  const handleSeatClick = async (seat: SeatData) => {
+  const handleSeatClick = async (seat: SeatAvailability) => {
     if (seat.availability !== 'available') return
     if (!user) { setShowOTP(true); return }
-    if (lockId) await releaseLock()
     setLockingId(seat.id)
     try {
-      const r = await fetch('/api/bookings/lock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ seatId: seat.id, shiftId: selectedShift!.id, date: selectedDate, userId: user.id }),
-      })
-      if (!r.ok) { alert('Seat just taken! Please pick another.'); await loadSeats(); return }
-      const { lockId: lid, expiresAt } = await r.json()
-      setLockId(lid)
-      setLockExpiry(new Date(expiresAt))
+      const lock = await BookingAPI.lock(seat.id, selectedShift!.id, selectedDate)
+      setLockId(lock.lockId as any)
+      setLockExpiry(new Date(lock.expiresAt))
       setSelectedSeat(seat)
+    } catch (e: any) {
+      alert(e.message || 'Seat just taken! Please pick another.')
+      await loadSeats()
     } finally { setLockingId(null) }
   }
 
@@ -123,7 +115,6 @@ export default function BookPage() {
 
   const handleLoginSuccess = (u: any) => {
     setUser(u)
-    localStorage.setItem('sf_user', JSON.stringify(u))
     setShowOTP(false)
   }
 
@@ -134,28 +125,25 @@ export default function BookPage() {
 
   const fmtTimer = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`
 
-  const rows = seats.reduce<Record<number, SeatData[]>>((acc, s) => {
+  const rows = seats.reduce<Record<number, SeatAvailability[]>>((acc, s) => {
     if (!acc[s.rowNumber]) acc[s.rowNumber] = []
     acc[s.rowNumber].push(s)
     return acc
   }, {})
 
   const stepNum = step === 'datetime' ? 1 : step === 'seats' ? 2 : 3
-
   const availCount = seats.filter(s => s.availability === 'available').length
 
   return (
     <>
       {showOTP && <OTPModal onSuccess={handleLoginSuccess} onClose={() => setShowOTP(false)} />}
-      {showPayment && selectedSeat && selectedShift && selectedPlan && (
+      {showPayment && selectedSeat && selectedShift && selectedPlan && centre && (
         <PaymentModal
           seat={selectedSeat}
           shift={selectedShift}
           date={selectedDate}
           plan={selectedPlan}
-          lockId={lockId!}
-          centreId={CENTRE_ID}
-          userId={user?.id}
+          centreId={centre.id}
           onSuccess={handlePaymentSuccess}
           onClose={() => setShowPayment(false)}
         />
@@ -173,7 +161,7 @@ export default function BookPage() {
         </div>
         <h1 className="text-headline-lg" style={{ color: 'var(--sf-text-1)' }}>Book a Spot</h1>
         <p style={{ fontSize: 15, color: 'var(--sf-text-2)', marginTop: 4 }}>
-          Select an available spot on the map or filter by amenities.
+          {centreError ? '⚠️ Could not load centre data. Is the backend running?' : `${centre?.name ?? 'Loading...'}`}
         </p>
       </div>
 
@@ -218,7 +206,7 @@ export default function BookPage() {
           {/* Shifts */}
           <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--sf-text-2)', letterSpacing: '0.06em', marginBottom: 14, textTransform: 'uppercase' }}>Select Shift</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 14, marginBottom: 28 }}>
-            {centre?.shifts?.map((s: ShiftData) => {
+            {centre?.shifts?.map((s: Shift) => {
               const active = selectedShift?.id === s.id
               const shiftIcon = s.shiftType === 'morning' ? '🌅' : s.shiftType === 'evening' ? '🌇' : '☀️'
               return (
@@ -234,14 +222,17 @@ export default function BookPage() {
                 </button>
               )
             })}
+            {!centre && !centreError && (
+              <div style={{ padding: 24, color: 'var(--sf-text-2)', textAlign: 'center' }}>Loading shifts…</div>
+            )}
           </div>
 
           {/* Pricing plans */}
-          {centre?.pricingPlans?.length > 0 && (
+          {(centre?.pricingPlans?.length ?? 0) > 0 && (
             <>
               <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--sf-text-2)', letterSpacing: '0.06em', marginBottom: 14, textTransform: 'uppercase' }}>Pricing Plan</h3>
               <div style={{ display: 'flex', gap: 12, marginBottom: 28, flexWrap: 'wrap' }}>
-                {centre.pricingPlans.map((p: PlanData) => {
+                {centre!.pricingPlans.map((p: PricingPlan) => {
                   const active = selectedPlan?.id === p.id
                   return (
                     <button key={p.id} onClick={() => setSelectedPlan(p)} style={{
@@ -259,7 +250,7 @@ export default function BookPage() {
             </>
           )}
 
-          <button className="btn btn-dark btn-full btn-lg" disabled={!selectedShift} onClick={goToSeats}>
+          <button className="btn btn-dark btn-full btn-lg" disabled={!selectedShift || !centre} onClick={goToSeats}>
             View Available Seats
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>arrow_forward</span>
           </button>
@@ -278,7 +269,7 @@ export default function BookPage() {
                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>grid_view</span>
                 Floor Plan
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>chevron_right</span>
-                <span style={{ color: 'var(--sf-blue)', fontWeight: 600 }}>Quiet Zone North</span>
+                <span style={{ color: 'var(--sf-blue)', fontWeight: 600 }}>{centre?.name}</span>
               </div>
 
               <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -302,7 +293,6 @@ export default function BookPage() {
 
             {/* Seat map card */}
             <div className="card" style={{ padding: 24, background: 'var(--sf-surface-low)' }}>
-              {/* Window indicator */}
               <div style={{ textAlign: 'center', marginBottom: 16 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--sf-blue)', letterSpacing: '0.12em', textTransform: 'uppercase', background: 'var(--primary-fixed)', padding: '4px 16px', borderRadius: 999 }}>
                   Floor-to-Ceiling Windows
@@ -318,7 +308,7 @@ export default function BookPage() {
                 <>
                   {Object.keys(rows).sort((a, b) => +a - +b).map(rowKey => {
                     const rowSeats = rows[+rowKey].sort((a, b) => a.colNumber - b.colNumber)
-                    const rowLabel = ['A', 'B', 'C', 'D', 'E', 'F'][+rowKey] ?? rowKey
+                    const rowLabel = ['A', 'B', 'C', 'D', 'E', 'F'][+rowKey - 1] ?? rowKey
                     return (
                       <div key={rowKey} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                         <span style={{ fontSize: 12, color: 'var(--outline)', width: 18, fontWeight: 700, textAlign: 'center' }}>{rowLabel}</span>
@@ -344,14 +334,12 @@ export default function BookPage() {
                     )
                   })}
 
-                  {/* Walkway */}
                   <div style={{ textAlign: 'center', margin: '16px 0', fontSize: 11, color: 'var(--outline)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                     — Main Walkway —
                   </div>
                 </>
               )}
 
-              {/* Entry indicator */}
               <div style={{ textAlign: 'center', marginTop: 12 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--sf-text-2)', letterSpacing: '0.1em', textTransform: 'uppercase', background: 'var(--sf-surface-container)', padding: '4px 16px', borderRadius: 999 }}>
                   🚪 Entry
@@ -374,56 +362,34 @@ export default function BookPage() {
                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a', display: 'inline-block' }} />
                     Available Now
                   </span>
-                  <span className="material-symbols-outlined" style={{ color: 'var(--outline)', cursor: 'pointer' }}>favorite_border</span>
                 </div>
                 <h2 style={{ fontSize: 28, fontWeight: 800, color: 'var(--sf-text-1)', letterSpacing: '-0.5px', marginBottom: 6 }}>
                   SPOT {selectedSeat.label}
                 </h2>
                 <p style={{ fontSize: 14, color: 'var(--sf-text-2)', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 20 }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>location_on</span>
-                  StudyHub · {selectedSeat.seatType?.replace('_', ' ')}
+                  {centre?.name} · {selectedSeat.seatType?.replace('_', ' ')}
                 </p>
 
-                {/* Duration tabs */}
+                {/* Duration selection */}
                 <div style={{ marginBottom: 20 }}>
                   <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--sf-text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Date & Duration</p>
                   <div style={{ display: 'flex', background: 'var(--sf-surface-container)', borderRadius: 8, padding: 4, gap: 4, marginBottom: 12 }}>
-                    {[{ label: '2h', plan: 0 }, { label: '4h', plan: 1 }, { label: 'Full Day', plan: 2 }].map((t, i) => {
-                      const plan = centre?.pricingPlans?.[i] ?? null
-                      const active = selectedPlan?.id === plan?.id
+                    {centre?.pricingPlans?.map((plan, i) => {
+                      const active = selectedPlan?.id === plan.id
                       return (
-                        <button key={t.label} onClick={() => plan && setSelectedPlan(plan)} style={{
+                        <button key={plan.id} onClick={() => setSelectedPlan(plan)} style={{
                           flex: 1, padding: '8px 4px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                          fontSize: 13, fontWeight: 600, transition: 'all 0.15s',
+                          fontSize: 11, fontWeight: 600, transition: 'all 0.15s',
                           background: active ? 'var(--sf-card)' : 'transparent',
                           color: active ? 'var(--sf-text-1)' : 'var(--sf-text-2)',
                           boxShadow: active ? '0 1px 4px rgba(0,0,0,0.1)' : 'none'
-                        }}>{t.label}</button>
+                        }}>{plan.name}</button>
                       )
                     })}
                   </div>
                   <div style={{ fontSize: 14, color: 'var(--sf-text-2)' }}>
                     📅 {fmtDate(selectedDate)} · {selectedShift?.startTime} – {selectedShift?.endTime}
-                  </div>
-                </div>
-
-                {/* Attributes */}
-                <div style={{ marginBottom: 20 }}>
-                  <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--sf-text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Attributes</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {[
-                      { icon: 'power', label: 'Power Socket', desc: 'Standard 240V available' },
-                      { icon: 'chair', label: 'Ergonomic Chair', desc: 'Adjustable Herman Miller' },
-                      { icon: 'wb_sunny', label: 'Near Window', desc: 'Natural light exposure' },
-                    ].map(attr => (
-                      <div key={attr.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                        <div style={{ width: 20, height: 20, borderRadius: 4, background: 'var(--sf-blue)', flexShrink: 0, marginTop: 2 }} />
-                        <div>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--sf-text-1)' }}>{attr.label}</div>
-                          <div style={{ fontSize: 12, color: 'var(--sf-text-2)' }}>{attr.desc}</div>
-                        </div>
-                      </div>
-                    ))}
                   </div>
                 </div>
 
@@ -468,9 +434,6 @@ export default function BookPage() {
           </div>
         </div>
       )}
-
-      {/* ── STEP 3: Confirm booking (from summary flow when seat is selected in step 2) ── */}
-      {/* Note: confirmation is handled inline in step 2 via the right panel */}
     </>
   )
 }

@@ -1,11 +1,12 @@
 'use client'
 import { useState } from 'react'
+import { BookingAPI, getStoredUser } from '@/lib/api'
 
 type Phase = 'choose' | 'processing' | 'success' | 'error'
 
-export default function PaymentModal({ seat, shift, date, plan, lockId, centreId, userId, onSuccess, onClose }: {
-  seat: any; shift: any; date: any; plan: any; lockId: string
-  centreId: string; userId: string
+export default function PaymentModal({ seat, shift, date, plan, centreId, onSuccess, onClose }: {
+  seat: any; shift: any; date: string; plan: any
+  centreId: string
   onSuccess: (bookingId: string) => void
   onClose: () => void
 }) {
@@ -18,18 +19,21 @@ export default function PaymentModal({ seat, shift, date, plan, lockId, centreId
     // Simulate payment gateway delay
     await new Promise(r => setTimeout(r, 1800))
 
-    const r = await fetch('/api/payments/confirm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        lockId, seatId: seat.id, shiftId: shift.id, date, userId,
-        centreId, pricingPlanId: plan.id, amount: plan.price,
-      }),
-    })
-    const data = await r.json()
-    if (!r.ok) { setError(data.error || 'Payment failed'); setPhase('error'); return }
-    setPhase('success')
-    setTimeout(() => onSuccess(data.bookingId), 1200)
+    try {
+      const booking = await BookingAPI.create({
+        seatId: seat.id,
+        shiftId: shift.id,
+        date,
+        centreId,
+        pricingPlanId: plan.id,
+        walkIn: false,
+      })
+      setPhase('success')
+      setTimeout(() => onSuccess((booking as any).id), 1200)
+    } catch (e: any) {
+      setError(e.message || 'Payment failed')
+      setPhase('error')
+    }
   }
 
   return (
@@ -77,9 +81,7 @@ export default function PaymentModal({ seat, shift, date, plan, lockId, centreId
             {method === 'upi' && (
               <div style={{ background: 'var(--sf-bg)', border: '1px solid var(--sf-border)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
                 <p style={{ fontSize: 13, color: 'var(--sf-text-2)', marginBottom: 8 }}>UPI ID</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input className="sf-input" defaultValue="yourupi@okaxis" style={{ flex: 1 }} />
-                </div>
+                <input className="sf-input" defaultValue="yourupi@okaxis" style={{ flex: 1 }} />
                 <p style={{ fontSize: 11, color: 'var(--sf-text-3)', marginTop: 8 }}>🎭 Demo mode — no real charge</p>
               </div>
             )}

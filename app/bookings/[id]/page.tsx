@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { BookingAPI } from '@/lib/api'
 
 export default function BookingConfirmPage() {
   const { id } = useParams<{ id: string }>()
@@ -9,8 +10,7 @@ export default function BookingConfirmPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`/api/bookings/${id}`)
-      .then(r => r.json())
+    BookingAPI.getById(id)
       .then(d => { setBooking(d); setLoading(false) })
       .catch(() => setLoading(false))
   }, [id])

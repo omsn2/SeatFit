@@ -1,8 +1,9 @@
 'use client'
 import { useRef, useState } from 'react'
+import { AuthAPI, storeUser } from '@/lib/api'
 
 export default function OTPModal({ onSuccess, onClose }: {
-  onSuccess: (user: any) => void
+  onSuccess: (user: { token: string; role: string; phone: string }) => void
   onClose: () => void
 }) {
   const [phase, setPhase] = useState<'phone' | 'otp'>('phone')
@@ -14,8 +15,14 @@ export default function OTPModal({ onSuccess, onClose }: {
 
   const sendOTP = async () => {
     setError(''); setLoading(true)
-    await fetch('/api/auth/send-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone }) })
-    setLoading(false); setPhase('otp')
+    try {
+      await AuthAPI.sendOtp(phone)
+      setPhase('otp')
+    } catch (e: any) {
+      setError(e.message || 'Failed to send OTP')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleOtpChange = (i: number, val: string) => {
@@ -29,14 +36,16 @@ export default function OTPModal({ onSuccess, onClose }: {
   const verifyOTP = async () => {
     setError(''); setLoading(true)
     const code = otp.join('')
-    const r = await fetch('/api/auth/verify-otp', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, otp: code }),
-    })
-    const data = await r.json()
-    setLoading(false)
-    if (!r.ok) { setError(data.error || 'Invalid OTP'); return }
-    onSuccess(data.user)
+    try {
+      const data = await AuthAPI.verifyOtp(phone, code)
+      const user = { token: data.accessToken, role: data.role, phone }
+      storeUser(user)
+      onSuccess(user)
+    } catch (e: any) {
+      setError(e.message || 'Invalid OTP')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

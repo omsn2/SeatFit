@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { BookingAPI, getStoredUser } from '@/lib/api'
 
 export default function MyBookingsPage() {
   const router = useRouter()
@@ -9,12 +10,10 @@ export default function MyBookingsPage() {
   const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
-    const stored = localStorage.getItem('sf_user')
-    if (!stored) { router.push('/book'); return }
-    const u = JSON.parse(stored); setUser(u)
-    fetch('/api/bookings', { headers: { 'x-user-id': u.id } })
-      .then(r => r.json())
-      .then(d => { setBookings(d); setLoading(false) })
+    const u = getStoredUser(); setUser(u)
+    if (!u) { router.push('/book'); return }
+    BookingAPI.myBookings()
+      .then(d => { setBookings(d.content || []); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 
