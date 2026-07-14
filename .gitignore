@@ -1,0 +1,7 @@
+# Ignore documentation drafts and agent rules
+AGENTS.md
+CLAUDE.md
+ClarityBeforeCode.md
+OwnerOnboarding.md
+Revenue.md
+errorlog.md
