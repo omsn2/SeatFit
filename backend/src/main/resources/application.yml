@@ -1,0 +1,74 @@
+spring:
+  application:
+    name: seatfit-backend
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:seatfit}
+    username: ${DB_USER:seatfit}
+    password: ${DB_PASSWORD:seatfit_dev}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: SeatFitPool
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate        # Flyway manages the schema — Hibernate just validates
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    repair-on-migrate: true     # auto-repair checksum mismatches (dev only)
+    out-of-order: false
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+# JWT
+jwt:
+  secret: ${JWT_SECRET:your-super-secret-key-change-in-production-minimum-256-bits}
+  access-token-expiry-ms: 900000        # 15 minutes
+  refresh-token-expiry-ms: 604800000    # 7 days
+
+# OTP (simulated in dev — replace with MSG91 in prod)
+otp:
+  expiry-minutes: 10
+  max-attempts: 3
+  rate-limit-per-hour: 3
+  dev-mode: ${OTP_DEV_MODE:true}        # When true: OTP is always "123456"
+
+# CORS — allow Next.js frontend
+cors:
+  allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
+
+# Seat lock TTL
+seat-lock:
+  ttl-minutes: 10
+
+# Razorpay
+razorpay:
+  key-id: ${RAZORPAY_KEY_ID:}
+  key-secret: ${RAZORPAY_KEY_SECRET:}
+  webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
+
+logging:
+  level:
+    com.seatfit: DEBUG
+    org.springframework.security: INFO
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
