@@ -3,6 +3,7 @@ package com.seatfit.repository;
 import com.seatfit.entity.Booking;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -21,10 +22,15 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
         UUID seatId, UUID shiftId, LocalDate date, Booking.BookingStatus status
     );
 
+    @EntityGraph(attributePaths = {"user", "seat", "centre", "shift", "pricingPlan"})
+    Optional<Booking> findById(UUID id);
+
     /** List bookings for a user, newest first */
+    @EntityGraph(attributePaths = {"user", "seat", "centre", "shift", "pricingPlan"})
     Page<Booking> findByUserIdOrderByCreatedAtDesc(UUID userId, Pageable pageable);
 
     /** List all bookings for a centre (admin view) */
+    @EntityGraph(attributePaths = {"user", "seat", "centre", "shift", "pricingPlan"})
     Page<Booking> findByCentreIdOrderByCreatedAtDesc(UUID centreId, Pageable pageable);
 
     /** Bookings for a centre on a specific date */

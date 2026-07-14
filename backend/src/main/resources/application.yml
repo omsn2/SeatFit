@@ -49,7 +49,7 @@ jwt:
 otp:
   expiry-minutes: 10
   max-attempts: 3
-  rate-limit-per-hour: 3
+  rate-limit-per-hour: 100
   dev-mode: ${OTP_DEV_MODE:true}        # When true: OTP is always "123456"
 
 # CORS — allow Next.js frontend

@@ -35,28 +35,29 @@ public class Booking {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    @JsonIgnoreProperties({"bookings","seatLocks","centre"})
+    @JsonIgnoreProperties({"bookings","seatLocks","centre","hibernateLazyInitializer","handler"})
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "seat_id", nullable = false)
-    @JsonIgnoreProperties({"bookings","seatLocks","centre"})
+    @JsonIgnoreProperties({"bookings","seatLocks","centre","hibernateLazyInitializer","handler"})
     private Seat seat;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "centre_id", nullable = false)
-    @JsonIgnoreProperties({"seats","shifts","pricingPlans","users","bookings"})
+    @JsonIgnoreProperties({"seats","shifts","pricingPlans","users","bookings","hibernateLazyInitializer","handler"})
     private Centre centre;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "shift_id", nullable = false)
-    @JsonIgnoreProperties({"bookings","centre"})
+    @JsonIgnoreProperties({"bookings","centre","hibernateLazyInitializer","handler"})
     private Shift shift;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pricing_plan_id", nullable = false)
-    @JsonIgnoreProperties({"bookings","centre"})
+    @JsonIgnoreProperties({"bookings","centre","hibernateLazyInitializer","handler"})
     private PricingPlan pricingPlan;
+
 
     @Column(nullable = false)
     private LocalDate bookingDate;
